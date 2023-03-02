@@ -3,6 +3,7 @@ package ibmcloud
 import (
 	"context"
 	"flag"
+	"hash/fnv"
 	"io"
 	"net"
 	"net/http"
@@ -202,12 +203,84 @@ func buckets(cfg COSConfig) ([]string, error) {
 	return bucketNames, nil
 }
 
+// bucketFromKey maps a key to a bucket name
+func (a *COSObjectClient) bucketFromKey(key string) string {
+	if len(a.bucketNames) == 0 {
+		return ""
+	}
+
+	hasher := fnv.New32a()
+	hasher.Write([]byte(key)) //nolint: errcheck
+	hash := hasher.Sum32()
+
+	return a.bucketNames[hash%uint32(len(a.bucketNames))]
+}
+
 // Stop fulfills the chunk.ObjectClient interface
 func (a *COSObjectClient) Stop() {}
 
 // DeleteObject deletes the specified objectKey from the appropriate S3 bucket
 func (a *COSObjectClient) DeleteObject(ctx context.Context, objectKey string) error {
-	return nil
+	return instrument.CollectedRequest(ctx, "cos.DeleteObject", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
+		deleteObjectInput := &s3.DeleteObjectInput{
+			Bucket: cos.String(a.bucketFromKey(objectKey)),
+			Key:    cos.String(objectKey),
+		}
+
+		_, err := a.cos.DeleteObjectWithContext(ctx, deleteObjectInput)
+		return err
+	})
+}
+
+// List implements chunk.ObjectClient.
+func (a *COSObjectClient) List(ctx context.Context, prefix, delimiter string) ([]client.StorageObject, []client.StorageCommonPrefix, error) {
+	var storageObjects []client.StorageObject
+	var commonPrefixes []client.StorageCommonPrefix
+
+	for i := range a.bucketNames {
+		err := instrument.CollectedRequest(ctx, "cos.List", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
+			input := s3.ListObjectsV2Input{
+				Bucket:    cos.String(a.bucketNames[i]),
+				Prefix:    cos.String(prefix),
+				Delimiter: cos.String(delimiter),
+			}
+
+			for {
+				output, err := a.cos.ListObjectsV2WithContext(ctx, &input)
+				if err != nil {
+					return err
+				}
+
+				for _, content := range output.Contents {
+					storageObjects = append(storageObjects, client.StorageObject{
+						Key:        *content.Key,
+						ModifiedAt: *content.LastModified,
+					})
+				}
+
+				for _, commonPrefix := range output.CommonPrefixes {
+					commonPrefixes = append(commonPrefixes, client.StorageCommonPrefix(cos.StringValue(commonPrefix.Prefix)))
+				}
+
+				if output.IsTruncated == nil || !*output.IsTruncated {
+					// No more results to fetch
+					break
+				}
+				if output.NextContinuationToken == nil {
+					// No way to continue
+					break
+				}
+				input.SetContinuationToken(*output.NextContinuationToken)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return storageObjects, commonPrefixes, nil
 }
 
 // GetObject returns a reader and the size for the specified object key from the configured S3 bucket.
@@ -218,11 +291,6 @@ func (a *COSObjectClient) GetObject(ctx context.Context, objectKey string) (io.R
 // PutObject into the store
 func (a *COSObjectClient) PutObject(ctx context.Context, objectKey string, object io.ReadSeeker) error {
 	return nil
-}
-
-// List implements chunk.ObjectClient.
-func (a *COSObjectClient) List(ctx context.Context, prefix, delimiter string) ([]client.StorageObject, []client.StorageCommonPrefix, error) {
-	return nil, nil, nil
 }
 
 // IsObjectNotFoundErr returns true if error means that object is not found. Relevant to GetObject and DeleteObject operations.
