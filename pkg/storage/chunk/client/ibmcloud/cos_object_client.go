@@ -28,7 +28,7 @@ import (
 	"github.com/weaveworks/common/instrument"
 )
 
-const DEFAULT_COS_AUTH_ENDPOINT = "https://iam.cloud.ibm.com/identity/token"
+const defaultCOSAuthEndpoint = "https://iam.cloud.ibm.com/identity/token"
 
 var (
 	errInvalidCOSHMACCredentials = errors.New("must supply both an Access Key ID and Secret Access Key or neither")
@@ -99,7 +99,7 @@ func (cfg *COSConfig) RegisterFlagsWithPrefix(prefix string, f *flag.FlagSet) {
 	f.IntVar(&cfg.BackoffConfig.MaxRetries, prefix+"COS.max-retries", 5, "Maximum number of times to retry when cos get Object")
 
 	f.Var(&cfg.ApiKey, prefix+"api-key", "api Key")
-	f.StringVar(&cfg.AuthEndpoint, prefix+"auth-endpoint", DEFAULT_COS_AUTH_ENDPOINT, "Auth Endpoint to connect to.")
+	f.StringVar(&cfg.AuthEndpoint, prefix+"auth-endpoint", defaultCOSAuthEndpoint, "Auth Endpoint to connect to.")
 	f.StringVar(&cfg.ServiceInstanceID, prefix+"service-instance-id", "", "COS service instance id to use")
 }
 
@@ -153,7 +153,7 @@ func validate(cfg COSConfig) error {
 	}
 
 	if cfg.ApiKey.String() != "" && cfg.AuthEndpoint == "" {
-		cfg.AuthEndpoint = DEFAULT_COS_AUTH_ENDPOINT
+		cfg.AuthEndpoint = defaultCOSAuthEndpoint
 	}
 
 	if cfg.ApiKey.String() != "" && cfg.ServiceInstanceID == "" {
