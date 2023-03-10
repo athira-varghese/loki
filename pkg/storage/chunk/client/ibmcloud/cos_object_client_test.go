@@ -187,13 +187,57 @@ func Test_COSConfig(t *testing.T) {
 			errEmptyBucket,
 		},
 		{
+			"API key is not provided/empty",
+			COSConfig{
+				BucketNames:       "test",
+				Endpoint:          "test",
+				Region:            "dummy",
+				AccessKeyID:       "dummy",
+				SecretAccessKey:   flagext.SecretWithValue("dummy"),
+				ServiceInstanceID: "dummy",
+				AuthEndpoint:      "dummy",
+			},
+			errInvalidCredentials,
+		},
+		{
+			"Service Instance ID is empty",
+			COSConfig{
+				BucketNames:       "test",
+				Endpoint:          "test",
+				Region:            "dummy",
+				AccessKeyID:       "dummy",
+				SecretAccessKey:   flagext.SecretWithValue("dummy"),
+				ApiKey: 		   flagext.SecretWithValue("dummy"),
+				ServiceInstanceID: "",
+				AuthEndpoint:      "dummy",
+			},
+			errInvalidCredentials,
+		},
+		{
+			"Auth Endpoint is empty",
+			COSConfig{
+				BucketNames:       "test",
+				Endpoint:          "test",
+				Region:            "dummy",
+				AccessKeyID:       "dummy",
+				SecretAccessKey:   flagext.SecretWithValue("dummy"),
+				ApiKey: 		   flagext.SecretWithValue("dummy"),
+				ServiceInstanceID: "dummy",
+				AuthEndpoint:      "",
+			},
+			errEmptyAuthEndpoint,
+		},
+		{
 			"valid config",
 			COSConfig{
-				BucketNames:     "test",
-				Endpoint:        "test",
-				Region:          "dummy",
-				AccessKeyID:     "dummy",
-				SecretAccessKey: flagext.SecretWithValue("dummy"),
+				BucketNames:       "test",
+				Endpoint:          "test",
+				Region:            "dummy",
+				AccessKeyID:       "dummy",
+				SecretAccessKey:   flagext.SecretWithValue("dummy"),
+				ApiKey: 		   flagext.SecretWithValue("dummy"),
+				ServiceInstanceID: "dummy",
+				AuthEndpoint:      "dummy",
 			},
 			nil,
 		},
@@ -416,3 +460,4 @@ func Test_List(t *testing.T) {
 		require.Equal(t, tt.storage_obj, storage_obj)
 	}
 }
+

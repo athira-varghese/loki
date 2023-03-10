@@ -38,6 +38,7 @@ var (
 	errCOSConfig                 = "failed to build cos config"
 	errServiceInstanceID         = errors.New("must supply ServiceInstanceID")
 	errInvalidCredentials        = errors.New("must supply any of Access Key ID and Secret Access Key or API Key")
+	errEmptyAuthEndpoint         = errors.New("must supply an Authentication Endpoint")
 )
 
 var cosRequestDuration = instrument.NewHistogramCollector(prometheus.NewHistogramVec(prometheus.HistogramOpts{
